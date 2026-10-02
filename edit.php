@@ -430,13 +430,17 @@ $types = [
 
     <?php endforeach; ?>
 
-    <button type="submit" class="btn btn-primary">
-        Save Changes
-    </button>
+  <button type="submit" class="btn btn-primary">
+    Update
+</button>
 
-    <a href="index.php" class="btn btn-secondary">
-        Back to list
-    </a>
+<a href="view.php?id=<?= e($id) ?>" class="btn btn-outline-success">
+    View
+</a>
+
+<a href="index.php" class="btn btn-secondary">
+    Back to list
+</a>
 
 </form>
 
