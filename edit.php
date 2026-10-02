@@ -30,13 +30,49 @@ $v = array_fill_keys($fields, '');
 $errors = [];
 $success = '';
 
+$id = trim($_GET['id'] ?? $_POST['id'] ?? '');
+
+if ($id === '') {
+    die('Student ID is required.');
+}
+
+/*
+ * Load the existing student.
+ */
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+
+    $sql = 'SELECT first_name, middle_name, last_name, birthday, sex,
+                   email, student_number, program, enrolment_date
+            FROM students
+            WHERE id = ?';
+
+    $stmt = mysqli_prepare($conn, $sql);
+    mysqli_stmt_bind_param($stmt, 's', $id);
+    mysqli_stmt_execute($stmt);
+
+    $result = mysqli_stmt_get_result($stmt);
+    $student = mysqli_fetch_assoc($result);
+
+    mysqli_stmt_close($stmt);
+
+    if (!$student) {
+        die('Student not found.');
+    }
+
+    foreach ($fields as $f) {
+        $v[$f] = $student[$f] ?? '';
+    }
+}
+
+/*
+ * Validate and update the student.
+ */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     foreach ($fields as $f) {
         $v[$f] = trim($_POST[$f] ?? '');
     }
 
-    // TODO(10)
     if (
         $v['first_name'] === '' ||
         strlen($v['first_name']) < 2 ||
@@ -68,7 +104,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Middle name: letters and spaces only, max 100.';
     }
 
-    // TODO(11)
     if (
         $v['email'] === '' ||
         !filter_var($v['email'], FILTER_VALIDATE_EMAIL)
@@ -81,7 +116,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'Birthday is required in YYYY-MM-DD format.';
     }
 
-    // TODO(12)
     if (!in_array($v['sex'], ['Male', 'Female'], true)) {
         $errors['sex'] = 'Select Male or Female.';
     }
@@ -110,19 +144,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($errors)) {
         try {
 
-            // TODO(13)
-            $sql = 'INSERT INTO students
-                    (id, first_name, middle_name, last_name, birthday, sex, email,
-                     student_number, program, enrolment_date)
-                    VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+            $sql = 'UPDATE students
+                    SET first_name = ?,
+                        middle_name = ?,
+                        last_name = ?,
+                        birthday = ?,
+                        sex = ?,
+                        email = ?,
+                        student_number = ?,
+                        program = ?,
+                        enrolment_date = ?
+                    WHERE id = ?';
 
             $stmt = mysqli_prepare($conn, $sql);
 
-            // TODO(14)
-            // The order must match the ? placeholders in the SQL.
             mysqli_stmt_bind_param(
                 $stmt,
-                'sssssssss',
+                'ssssssssss',
                 $v['first_name'],
                 $v['middle_name'],
                 $v['last_name'],
@@ -131,30 +169,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $v['email'],
                 $v['student_number'],
                 $v['program'],
-                $v['enrolment_date']
+                $v['enrolment_date'],
+                $id
             );
 
             mysqli_stmt_execute($stmt);
 
-            // UUID() generates the ID, so use affected_rows
-            // instead of insert_id.
-            if (mysqli_stmt_affected_rows($stmt) === 1) {
-                $success = 'Student created successfully!';
-                $v = array_fill_keys($fields, '');
-            }
+            $success = 'Student updated successfully!';
 
             mysqli_stmt_close($stmt);
 
         } catch (mysqli_sql_exception $ex) {
 
-            // Duplicate email or student number
             if ($ex->getCode() === 1062) {
                 $errors['email'] =
                     'Email or student number already exists.';
             } else {
-                error_log('Insert failed: ' . $ex->getMessage());
+                error_log('Update failed: ' . $ex->getMessage());
                 $errors['form'] =
-                    'Could not save the student.';
+                    'Could not update the student.';
             }
         }
     }
@@ -184,7 +217,8 @@ $types = [
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Add New Student</title>
+
+    <title>Edit Student</title>
 
     <link
         rel="stylesheet"
@@ -305,7 +339,7 @@ $types = [
 
 <body class="container py-4" style="max-width: 680px;">
 
-<h2>Add New Student</h2>
+<h2>Edit Student</h2>
 
 <?php if ($success): ?>
     <div class="alert alert-success">
@@ -322,6 +356,8 @@ $types = [
 <div class="panel">
 
 <form method="POST" novalidate>
+
+    <input type="hidden" name="id" value="<?= e($id) ?>">
 
     <?php foreach ($labels as $name => $label): ?>
 
@@ -395,7 +431,7 @@ $types = [
     <?php endforeach; ?>
 
     <button type="submit" class="btn btn-primary">
-        Save
+        Save Changes
     </button>
 
     <a href="index.php" class="btn btn-secondary">
